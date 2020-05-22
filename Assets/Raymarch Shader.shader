@@ -2,7 +2,6 @@
 {
     Properties
     {
-        _RaymarchTexture ("Raymarch Texture", 3D) = "white" {}
         _Epsilon ("_Epsilon", Range(0.00001, 0.025)) = 0.0005
     }
     SubShader
@@ -31,9 +30,10 @@
                 float3 rayDestination : TEXCOORD1;
             };
 
-            uniform sampler3D _RaymarchTexture;
-            uniform float _Epsilon;
             uniform int _VoxelGridSize;
+            uniform float _Epsilon;
+
+            sampler3D _RaymarchTexture;
 
             v2f vert (appdata vert)
             {

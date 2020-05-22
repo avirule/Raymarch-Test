@@ -1,6 +1,5 @@
 ﻿#region
 
-using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -13,7 +12,7 @@ public class RaymarchVolume : MonoBehaviour
     private static readonly int _VoxelGridSize = Shader.PropertyToID("_VoxelGridSize");
     private static readonly int _RaymarchTexture = Shader.PropertyToID("_RaymarchTexture");
 
-    private short[] _Blocks;
+    private bool[] _Blocks;
 
     private Texture3D _Texture;
 
@@ -30,7 +29,7 @@ public class RaymarchVolume : MonoBehaviour
         };
 
         Vector3 origin = transform.position * GridSize;
-        _Blocks = new short[GridSize * GridSize * GridSize];
+        _Blocks = new bool[GridSize * GridSize * GridSize];
 
         int index = 0;
         for (int y = 0; y < GridSize; y++)
@@ -43,7 +42,7 @@ public class RaymarchVolume : MonoBehaviour
                     float noise = Mathf.PerlinNoise(asOrigin.x / 1000f, asOrigin.z / 100f);
                     int noiseHeight = (int)(GridSize * noise);
 
-                    _Blocks[index] = y <= noiseHeight ? (short)noiseHeight : (short)-1;
+                    _Blocks[index] = y <= noiseHeight;
                 }
             }
         }
@@ -61,20 +60,15 @@ public class RaymarchVolume : MonoBehaviour
         CreateTerrainTexture createTerrainTexture = new CreateTerrainTexture(GridSize, _Blocks);
         JobHandle jobHandle = createTerrainTexture.Schedule(_Blocks.Length, 256);
         jobHandle.Complete();
-        createTerrainTexture.Blocks.Dispose();
-
-        float[] distances = new float[_Blocks.Length];
-        createTerrainTexture.OutputDistances.CopyTo(distances);
-        createTerrainTexture.OutputDistances.Dispose();
 
         int index = 0;
         for (int y = 0; y < GridSize; y++)
         for (int z = 0; z < GridSize; z++)
         for (int x = 0; x < GridSize; x++, index++)
         {
-            float distance = distances[index];
+            byte distance = createTerrainTexture.OutputDistances[index];
 
-            _Texture.SetPixel(x, y, z, distance >= 1f ? Color.white : new Color(0f, 0f, 0f, distance));
+            _Texture.SetPixel(x, y, z, distance >= 1f ? Color.white : new Color(0f, 0f, 0f, distance / (float)GridSize));
 
             // if (IsSolid(x, y, z))
             // {
@@ -101,6 +95,9 @@ public class RaymarchVolume : MonoBehaviour
             //     _Texture.SetPixel(x, y, z, new Color(0f, 0f, 0f, FindMaximumJump(x, y, z) / (float)GridSize));
             // }
         }
+
+        createTerrainTexture.OutputDistances.Dispose();
+        createTerrainTexture.Blocks.Dispose();
     }
 
     // private int FindMaximumJump(int startX, int startY, int startZ)

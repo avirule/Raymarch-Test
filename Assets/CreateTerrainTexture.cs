@@ -16,26 +16,27 @@ public struct CreateTerrainTexture : IJobParallelFor
     private readonly int _GridSize;
 
     [ReadOnly]
-    public NativeArray<short> Blocks;
-    public NativeArray<float> OutputDistances;
+    public NativeArray<bool> Blocks;
 
-    public CreateTerrainTexture(int gridSize, short[] blocks)
+    public NativeArray<byte> OutputDistances;
+
+    public CreateTerrainTexture(int gridSize, bool[] blocks)
     {
         _GridSize = gridSize;
-        Blocks = new NativeArray<short>(blocks, Allocator.TempJob);
-        OutputDistances = new NativeArray<float>(blocks.Length, Allocator.TempJob);
+        Blocks = new NativeArray<bool>(blocks, Allocator.TempJob);
+        OutputDistances = new NativeArray<byte>(blocks.Length, Allocator.TempJob);
     }
 
     public void Execute(int index)
     {
-        if (Blocks[index] > -1)
+        if (Blocks[index])
         {
-            OutputDistances[index] = 1f;
+            OutputDistances[index] = 255;
         }
         else
         {
             Project3D(index, _GridSize, out int x, out int y, out int z);
-            OutputDistances[index] = FindMaximumJump(x, y, z) / (float)_GridSize;
+            OutputDistances[index] = (byte)FindMaximumJump(x, y, z);
         }
     }
 
@@ -70,7 +71,7 @@ public struct CreateTerrainTexture : IJobParallelFor
     }
 
     private bool IsSolid(int index, int x, int y, int z) =>
-        (x >= 0) && (y >= 0) && (z >= 0) && (x < _GridSize) && (y < _GridSize) && (z < _GridSize) && (Blocks[index] > -1);
+        (x >= 0) && (y >= 0) && (z >= 0) && (x < _GridSize) && (y < _GridSize) && (z < _GridSize) && Blocks[index];
 
     private static int Project1D(int x, int y, int z, int size) => x + (size * (z + (size * y)));
 
