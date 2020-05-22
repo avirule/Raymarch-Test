@@ -1,5 +1,6 @@
 ﻿#region
 
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using Random = System.Random;
@@ -8,89 +9,100 @@ using Random = System.Random;
 
 public class RaymarchVolume : MonoBehaviour
 {
-    private static readonly int _Positions = Shader.PropertyToID("_Positions");
-    private static readonly int _Length = Shader.PropertyToID("_Length");
-    private static readonly int _VoxelSize = Shader.PropertyToID("_VoxelSize");
     private static readonly int _VoxelGridSize = Shader.PropertyToID("_VoxelGridSize");
     private static readonly int _RaymarchTexture = Shader.PropertyToID("_RaymarchTexture");
 
-    private bool[][][] _Blocks;
-
-    private Color[] _Colors =
-    {
-        Color.white,
-        Color.blue,
-        Color.yellow,
-        Color.green,
-    };
+    private short[][][] _Blocks;
 
     private Texture3D _Texture;
 
     public MeshRenderer MeshRenderer;
+    public int GridSize = 32;
 
 
     // Start is called before the first frame update
     private void Start()
     {
-        _Texture = new Texture3D(32, 32, 32, GraphicsFormat.R32G32B32A32_SFloat, TextureCreationFlags.None)
+        _Texture = new Texture3D(GridSize, GridSize, GridSize, GraphicsFormat.R32G32B32A32_SFloat, TextureCreationFlags.None)
         {
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Point
         };
 
-        Vector3 origin = transform.position * 32;
-        _Blocks = new bool[32][][];
 
-        for (int x = 0; x < 32; x++)
+        Debug.Log("A1");
+
+        Vector3 origin = transform.position * GridSize;
+        _Blocks = new short[GridSize][][];
+
+        for (int x = 0; x < GridSize; x++)
         {
-            _Blocks[x] = new bool[32][];
+            _Blocks[x] = new short[GridSize][];
 
-            for (int z = 0; z < 32; z++)
+            for (int z = 0; z < GridSize; z++)
             {
-                _Blocks[x][z] = new bool[32];
+                _Blocks[x][z] = new short[GridSize];
             }
         }
 
-        for (int x = 0; x < 32; x++)
+        Debug.Log("A2");
+
+        for (int x = 0; x < GridSize; x++)
         {
-            for (int z = 0; z < 32; z++)
+            for (int z = 0; z < GridSize; z++)
             {
                 Vector3 asOrigin = origin + new Vector3(x, 0f, z);
                 float noise = Mathf.PerlinNoise(asOrigin.x / 1000f, asOrigin.z / 100f);
-                int noiseHeight = (int)(32 * noise);
+                int noiseHeight = (int)(GridSize * noise);
 
-                for (int y = 0; y < 32; y++)
+                for (int y = 0; y < GridSize; y++)
                 {
-                    _Blocks[x][y][z] = y <= noiseHeight;
+                    _Blocks[x][y][z] = y <= noiseHeight ? (short)noiseHeight : (short)-1;
                 }
             }
         }
+
+        Debug.Log("A3");
 
         MakeJumpTexture();
 
         _Texture.Apply();
 
-        MeshRenderer.sharedMaterial.SetTexture(_RaymarchTexture, _Texture);
-        MeshRenderer.sharedMaterial.SetInt(_VoxelGridSize, 32);
+        MeshRenderer.material.SetTexture(_RaymarchTexture, _Texture);
+        MeshRenderer.material.SetInt(_VoxelGridSize, GridSize);
     }
 
     private void MakeJumpTexture()
     {
-        Random rand = new Random(transform.position.GetHashCode());
-        int currentColor = 0;
+        Random random = new Random();
 
-        for (int x = 0; x < 32; x++)
-        for (int y = 0; y < 32; y++)
-        for (int z = 0; z < 32; z++)
+        for (int x = 0; x < GridSize; x++)
+        for (int y = 0; y < GridSize; y++)
+        for (int z = 0; z < GridSize; z++)
         {
             if (IsSolid(x, y, z))
             {
-                _Texture.SetPixel(x, y, z, _Colors[currentColor]);
-                currentColor = (currentColor + rand.Next(0, _Colors.Length)) % _Colors.Length;
+                float3 colorNoise = random.Next(-50, 51) * 0.0005f;
+
+                if (y == _Blocks[x][y][z])
+                {
+                    float3 color = new float3(0.38f, 0.59f, 0.20f) + colorNoise;
+                    _Texture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
+                }
+                else if ((y < _Blocks[x][y][z]) && (y > (_Blocks[x][y][z] - 3)))
+                {
+                    float3 color = new float3(0.36f, 0.25f, 0.2f) + colorNoise;
+                    _Texture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
+                }
+                else
+                {
+                    float3 color = new float3(0.41f) + colorNoise;
+                    _Texture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
+                }
             }
             else
             {
-                _Texture.SetPixel(x, y, z, new Color(0f, 0f, 0f, FindMaximumJump(x, y, z) / 32f));
+                _Texture.SetPixel(x, y, z, new Color(0f, 0f, 0f, FindMaximumJump(x, y, z) / (float)GridSize));
             }
         }
     }
@@ -101,7 +113,7 @@ public class RaymarchVolume : MonoBehaviour
 
         while (IsEmpty(startX - (jumpSize + 1), startY - (jumpSize + 1), startZ - (jumpSize + 1), startX + jumpSize + 1, startY + jumpSize + 1,
                    startZ + jumpSize + 1)
-               && (jumpSize < 32))
+               && (jumpSize < GridSize))
         {
             jumpSize += 1;
         }
@@ -124,5 +136,5 @@ public class RaymarchVolume : MonoBehaviour
         return true;
     }
 
-    private bool IsSolid(int x, int y, int z) => (x >= 0) && (y >= 0) && (z >= 0) && ((x < 32) & (y < 32)) && (z < 32) && _Blocks[x][y][z];
+    private bool IsSolid(int x, int y, int z) => (x >= 0) && (y >= 0) && (z >= 0) && (x < GridSize) && (y < GridSize) && (z < GridSize) && (_Blocks[x][y][z] > -1);
 }

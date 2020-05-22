@@ -3,6 +3,7 @@
     Properties
     {
         _RaymarchTexture ("Raymarch Texture", 3D) = "white" {}
+        _Epsilon ("_Epsilon", Range(0.0001, 0.125)) = 0.0005
     }
     SubShader
     {
@@ -31,8 +32,9 @@
                 float3 rayDestination : TEXCOORD1;
             };
 
-            uniform uint _VoxelGridSize;
             uniform sampler3D _RaymarchTexture;
+            uniform float _Epsilon;
+            uniform int _VoxelGridSize;
 
             v2f vert (appdata vert)
             {
@@ -80,7 +82,7 @@
                 // return tex3D(_RaymarchTexture, accumulatedRay);
 
                 [loop]
-                while (accumulatedDistance <= maximumAccumulatedDistance)
+                while (accumulatedDistance < maximumAccumulatedDistance)
                 {
                     float3 accumulatedRay = rayOrigin + (rayDirection * accumulatedDistance) + 0.5;
                     fixed4 color = tex3D(_RaymarchTexture, accumulatedRay);
@@ -90,10 +92,10 @@
                         return color;
                     }
 
-                    accumulatedDistance += max(0.0005, color.a);
+                    accumulatedDistance += max(_Epsilon, color.a);
                 }
 
-                return 1.0;
+                return 0.0;
             }
 
 
@@ -103,7 +105,7 @@
                 frag.rayOrigin += rayDirection * _ProjectionParams.y;
                 fixed4 color = raymarch(frag.rayOrigin, rayDirection);
 
-                if (color.a == 0.0)
+                if (color.a < 1.0)
                 {
                     discard;
                 }
