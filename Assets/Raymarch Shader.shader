@@ -28,7 +28,7 @@
             {
                 float4 clip : SV_POSITION;
                 float3 rayOrigin : TEXCOORD0;
-                float3 rayDirection : TEXCOORD1;
+                float3 rayDestination : TEXCOORD1;
             };
 
             uniform uint _VoxelGridSize;
@@ -39,7 +39,7 @@
                 v2f frag;
                 frag.clip = UnityObjectToClipPos(vert.vertex);
                 frag.rayOrigin = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1.0));
-                frag.rayDirection = normalize(vert.vertex - frag.rayOrigin);
+                frag.rayDestination = vert.vertex;
                 return frag;
             }
 
@@ -56,10 +56,8 @@
                 float3 minimumDistanceParameter = min(distanceParameter1, distanceParameter2);
                 float3 maximumDistanceParameter = max(distanceParameter1, distanceParameter2);
 
-                nearIntersectionDistance = max(minimumDistanceParameter.x, min(minimumDistanceParameter.y,
-                    minimumDistanceParameter.z));
-                farIntersectionDistance = min(maximumDistanceParameter.x, min(maximumDistanceParameter.y,
-                    maximumDistanceParameter.z));
+                nearIntersectionDistance = max(minimumDistanceParameter.x, max(minimumDistanceParameter.y, minimumDistanceParameter.z));
+                farIntersectionDistance = min(maximumDistanceParameter.x, min(maximumDistanceParameter.y, maximumDistanceParameter.z));
 
                 return nearIntersectionDistance <= farIntersectionDistance;
             }
@@ -67,13 +65,19 @@
             fixed4 raymarch(float3 rayOrigin, float3 rayDirection)
             {
                 float nearIntersectionDistance, farIntersectionDistance;
-                cubeRayIntersection(rayOrigin, rayDirection, -0.5, 0.5, nearIntersectionDistance, farIntersectionDistance);
+                if (!cubeRayIntersection(rayOrigin, rayDirection, -0.5, 0.5, nearIntersectionDistance, farIntersectionDistance))
+                {
+                    return 0.0;
+                }
 
                 // if near intersection is less than zero (we're inside cube), then raycast from zero
                 nearIntersectionDistance *= (nearIntersectionDistance >= 0.0);
 
                 float accumulatedDistance = nearIntersectionDistance;
                 float maximumAccumulatedDistance = farIntersectionDistance;
+
+                // float3 accumulatedRay = rayOrigin + (rayDirection * accumulatedDistance) + 0.5;
+                // return tex3D(_RaymarchTexture, accumulatedRay);
 
                 [loop]
                 while (accumulatedDistance <= maximumAccumulatedDistance)
@@ -86,16 +90,18 @@
                         return color;
                     }
 
-                    accumulatedDistance += max(1.0 / _VoxelGridSize, color.a);
+                    accumulatedDistance += max(0.0005, color.a);
                 }
 
-                return 0.0;
+                return 1.0;
             }
 
 
             fixed4 frag (v2f frag) : SV_TARGET
             {
-                fixed4 color = raymarch(frag.rayOrigin, frag.rayDirection);
+                float3 rayDirection = normalize(frag.rayDestination - frag.rayOrigin);
+                frag.rayOrigin += rayDirection * _ProjectionParams.y;
+                fixed4 color = raymarch(frag.rayOrigin, rayDirection);
 
                 if (color.a == 0.0)
                 {

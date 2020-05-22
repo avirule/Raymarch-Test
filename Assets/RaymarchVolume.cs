@@ -1,9 +1,8 @@
 ﻿#region
 
-using System.Linq;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using Random = System.Random;
 
 #endregion
 
@@ -16,6 +15,15 @@ public class RaymarchVolume : MonoBehaviour
     private static readonly int _RaymarchTexture = Shader.PropertyToID("_RaymarchTexture");
 
     private bool[][][] _Blocks;
+
+    private Color[] _Colors =
+    {
+        Color.white,
+        Color.blue,
+        Color.yellow,
+        Color.green,
+    };
+
     private Texture3D _Texture;
 
     public MeshRenderer MeshRenderer;
@@ -26,7 +34,7 @@ public class RaymarchVolume : MonoBehaviour
     {
         _Texture = new Texture3D(32, 32, 32, GraphicsFormat.R32G32B32A32_SFloat, TextureCreationFlags.None)
         {
-            wrapMode = TextureWrapMode.Repeat,
+            wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Point
         };
 
@@ -68,17 +76,22 @@ public class RaymarchVolume : MonoBehaviour
 
     private void MakeJumpTexture()
     {
-        bool green = false;
+        Random rand = new Random(transform.position.GetHashCode());
+        int currentColor = 0;
 
         for (int x = 0; x < 32; x++)
         for (int y = 0; y < 32; y++)
         for (int z = 0; z < 32; z++)
         {
-            _Texture.SetPixel(x, y, z, IsSolid(x, y, z)
-                ? green ? new Color(0f, 1f, 0f, 1f) : Color.white
-                : new Color(0f, 0f, 0f, FindMaximumJump(x, y, z) / 32f));
-
-            green = !green;
+            if (IsSolid(x, y, z))
+            {
+                _Texture.SetPixel(x, y, z, _Colors[currentColor]);
+                currentColor = (currentColor + rand.Next(0, _Colors.Length)) % _Colors.Length;
+            }
+            else
+            {
+                _Texture.SetPixel(x, y, z, new Color(0f, 0f, 0f, FindMaximumJump(x, y, z) / 32f));
+            }
         }
     }
 
