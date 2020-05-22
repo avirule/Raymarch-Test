@@ -1,11 +1,8 @@
-﻿Shader "Unlit/NewUnlitShader"
+﻿Shader "Unlit/Raymarch Shader"
 {
     Properties
     {
         _RaymarchTexture ("Raymarch Texture", 3D) = "white" {}
-        _MaximumRaySteps ("Maximum Ray Steps", Range(0, 128)) = 32
-        _MaximumRayDistance ("Maximum Ray Distance", Range(0, 128)) = 32
-        _MinimumSurfaceDistance("Minimum Surface Distance", Range (0.0, 1.0)) = 0.001
     }
     SubShader
     {
@@ -29,65 +26,76 @@
 
             struct v2f
             {
-                float4 vertex : SV_POSITION;
+                float4 clip : SV_POSITION;
                 float3 rayOrigin : TEXCOORD0;
-                float3 hitPosition : TEXCOORD1;
+                float3 rayDirection : TEXCOORD1;
             };
 
             uniform uint _VoxelGridSize;
+            uniform sampler3D _RaymarchTexture;
 
-            sampler3D _RaymarchTexture;
-            int _MaximumRaySteps;
-            int _MaximumRayDistance;
-            float _MinimumSurfaceDistance;
-
-            v2f vert (appdata vertexIn)
+            v2f vert (appdata vert)
             {
-                v2f v2fOut;
-                v2fOut.vertex = UnityObjectToClipPos(vertexIn.vertex);
-                v2fOut.rayOrigin = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1.0));
-                v2fOut.hitPosition = vertexIn.vertex;
-                return v2fOut;
+                v2f frag;
+                frag.clip = UnityObjectToClipPos(vert.vertex);
+                frag.rayOrigin = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1.0));
+                frag.rayDirection = normalize(vert.vertex - frag.rayOrigin);
+                return frag;
             }
 
-            const float epsilon = 0.0005;
-
-            fixed4 raymarch(float3 position, float3 normal)
+            bool cubeRayIntersection(float3 rayOrigin, float3 rayDirection, float3 cubeMinimum, float3 cubeMaximum,
+                out float nearIntersectionDistance, out float farIntersectionDistance)
             {
-                float3 gridOrigin = floor(position * _VoxelGridSize);
-                float3 maxGridOrigin = gridOrigin + 1.0;
-                float maxGridOriginComp = max(maxGridOrigin.x, max(maxGridOrigin.y, maxGridOrigin.z));
-                // align position to voxel grid
-                position = gridOrigin / _VoxelGridSize;
+                // take inverse to avoid slow floating point division in pure ray-aabb function
+                float3 inverseDirection = 1.0 / rayDirection;
 
-                float maximumRayDistance = 1.0;
-                float minimumStepDistance = 1.0 / _VoxelGridSize;
-                float accumulatedDistance = 0.0;
+                // calculate raw distance parameters, effectively distance along ray to intersect axes
+                float3 distanceParameter1 = inverseDirection * (cubeMinimum - rayOrigin);
+                float3 distanceParameter2 = inverseDirection * (cubeMaximum - rayOrigin);
+
+                float3 minimumDistanceParameter = min(distanceParameter1, distanceParameter2);
+                float3 maximumDistanceParameter = max(distanceParameter1, distanceParameter2);
+
+                nearIntersectionDistance = max(minimumDistanceParameter.x, min(minimumDistanceParameter.y,
+                    minimumDistanceParameter.z));
+                farIntersectionDistance = min(maximumDistanceParameter.x, min(maximumDistanceParameter.y,
+                    maximumDistanceParameter.z));
+
+                return nearIntersectionDistance <= farIntersectionDistance;
+            }
+
+            fixed4 raymarch(float3 rayOrigin, float3 rayDirection)
+            {
+                float nearIntersectionDistance, farIntersectionDistance;
+                cubeRayIntersection(rayOrigin, rayDirection, -0.5, 0.5, nearIntersectionDistance, farIntersectionDistance);
+
+                // if near intersection is less than zero (we're inside cube), then raycast from zero
+                nearIntersectionDistance *= (nearIntersectionDistance >= 0.0);
+
+                float accumulatedDistance = nearIntersectionDistance;
+                float maximumAccumulatedDistance = farIntersectionDistance;
 
                 [loop]
-                while (accumulatedDistance < maxGridOriginComp)
+                while (accumulatedDistance <= maximumAccumulatedDistance)
                 {
-                    float3 currentPosition = position + (accumulatedDistance * normal);
-                    fixed4 currentColor = tex3D(_RaymarchTexture, currentPosition);
+                    float3 accumulatedRay = rayOrigin + (rayDirection * accumulatedDistance) + 0.5;
+                    fixed4 color = tex3D(_RaymarchTexture, accumulatedRay);
 
-                    if (currentColor.a == 1.0)
+                    if (color.a == 1.0)
                     {
-                        return currentColor;
+                        return color;
                     }
-                    else
-                    {
-                        accumulatedDistance += currentColor.a;
-                    }
+
+                    accumulatedDistance += max(1.0 / _VoxelGridSize, color.a);
                 }
 
                 return 0.0;
             }
 
 
-            fixed4 frag (v2f i) : COLOR
+            fixed4 frag (v2f frag) : SV_TARGET
             {
-                float3 rayNormal = normalize(i.hitPosition - i.rayOrigin);
-                fixed4 color = raymarch(i.rayOrigin, rayNormal);
+                fixed4 color = raymarch(frag.rayOrigin, frag.rayDirection);
 
                 if (color.a == 0.0)
                 {
