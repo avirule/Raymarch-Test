@@ -1,22 +1,20 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿#region
+
 using UnityEngine;
 using UnityEngine.UI;
 
+#endregion
+
 public class FPS : MonoBehaviour
 {
+    private int skippedUpdates;
     public Text TextObject;
 
     // Start is called before the first frame update
-    void Start()
-    {
-
-    }
-
-    private int skippedUpdates = 0;
+    private void Start() { }
 
     // Update is called once per frame
-    void Update()
+    private void Update()
     {
         if (skippedUpdates == 4)
         {
