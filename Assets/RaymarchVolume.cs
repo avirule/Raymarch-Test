@@ -1,5 +1,7 @@
 ﻿#region
 
+using System;
+using System.IO;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -17,7 +19,7 @@ public class RaymarchVolume : MonoBehaviour
     private Texture3D _Texture;
 
     public MeshRenderer MeshRenderer;
-    public int GridSize = 32;
+    public const int GridSize = 24;
 
 
     // Start is called before the first frame update
@@ -28,9 +30,6 @@ public class RaymarchVolume : MonoBehaviour
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Point
         };
-
-
-        Debug.Log("A1");
 
         Vector3 origin = transform.position * GridSize;
         _Blocks = new short[GridSize][][];
@@ -44,8 +43,6 @@ public class RaymarchVolume : MonoBehaviour
                 _Blocks[x][z] = new short[GridSize];
             }
         }
-
-        Debug.Log("A2");
 
         for (int x = 0; x < GridSize; x++)
         {
@@ -61,8 +58,6 @@ public class RaymarchVolume : MonoBehaviour
                 }
             }
         }
-
-        Debug.Log("A3");
 
         MakeJumpTexture();
 

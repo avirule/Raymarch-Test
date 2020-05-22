@@ -3,11 +3,12 @@
     Properties
     {
         _RaymarchTexture ("Raymarch Texture", 3D) = "white" {}
-        _Epsilon ("_Epsilon", Range(0.0001, 0.125)) = 0.0005
+        _Epsilon ("_Epsilon", Range(0.000001, 0.125)) = 0.0005
     }
     SubShader
     {
         Tags { "RenderType"="Opaque" }
+        Cull Off
         LOD 100
 
         Pass
@@ -17,8 +18,6 @@
             #pragma fragment frag
 
             #include "UnityCG.cginc"
-
-            #define SURF_DIST 0.001
 
             struct appdata
             {
@@ -67,13 +66,10 @@
             fixed4 raymarch(float3 rayOrigin, float3 rayDirection)
             {
                 float nearIntersectionDistance, farIntersectionDistance;
-                if (!cubeRayIntersection(rayOrigin, rayDirection, -0.5, 0.5, nearIntersectionDistance, farIntersectionDistance))
-                {
-                    return 0.0;
-                }
+                cubeRayIntersection(rayOrigin, rayDirection, -0.5, 0.5, nearIntersectionDistance, farIntersectionDistance);
 
                 // if near intersection is less than zero (we're inside cube), then raycast from zero
-                nearIntersectionDistance *= (nearIntersectionDistance >= 0.0);
+                //nearIntersectionDistance *= (nearIntersectionDistance >= 0.0);
 
                 float accumulatedDistance = nearIntersectionDistance;
                 float maximumAccumulatedDistance = farIntersectionDistance;
