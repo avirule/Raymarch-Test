@@ -3,7 +3,7 @@
     Properties
     {
         _RaymarchTexture ("Raymarch Texture", 3D) = "white" {}
-        _Epsilon ("_Epsilon", Range(0.000001, 0.125)) = 0.0005
+        _Epsilon ("_Epsilon", Range(0.00001, 0.025)) = 0.0005
     }
     SubShader
     {
