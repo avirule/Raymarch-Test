@@ -95,6 +95,7 @@
 
         Pass
         {
+            ZTest Always
             CGPROGRAM
 
             #pragma vertex vert
@@ -130,21 +131,10 @@
             {
                 float3 rayDirection = normalize(frag.rayDestination - frag.rayOrigin);
                 frag.rayOrigin += rayDirection * _ProjectionParams.y;
-                float depth = raymarchDepth(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
-
-                if (depth == 0.0)
-                {
-                    discard;
-                }
-
-                return depth;
+                return raymarchDepth(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
             }
 
             ENDCG
-        }
-        GrabPass
-        {
-            "_DepthTexture"
         }
         Pass
         {
@@ -165,12 +155,11 @@
                 float4 clip : SV_POSITION;
                 float3 rayOrigin : TEXCOORD0;
                 float3 rayDestination : TEXCOORD1;
-                float4 screen : TEXCOORD2;
+                float2 screen : TEXCOORD2;
             };
 
-            uniform sampler2D_float _DepthTexture;
+            uniform sampler2D _DepthTexture;
             uniform sampler3D _RaymarchTexture;
-            uniform int _VoxelGridSize;
             uniform float _Epsilon;
             uniform int _AOIntensity;
 
@@ -180,11 +169,11 @@
                 frag.clip = UnityObjectToClipPos(vert.vertex);
                 frag.rayOrigin = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1.0));
                 frag.rayDestination = vert.vertex;
-                frag.screen = ComputeGrabScreenPos(frag.clip);
+                frag.screen = ComputeScreenPos(frag.clip);
                 return frag;
             }
 
-            float frag(v2f frag) : SV_TARGET
+            fixed4 frag(v2f frag) : SV_TARGET
             {
                 //float3 rayDirection = normalize(frag.rayDestination - frag.rayOrigin);
                 //frag.rayOrigin += rayDirection * _ProjectionParams.y;
@@ -196,29 +185,16 @@
                 //    discard;
                 //}
 
-                //float origin, up, right, down, left;
-                //origin = tex2D(_DepthTexture, frag.screen.xy);
-                //up = tex2D(_DepthTexture, frag.screen.xy + float2(0.0, 1.0));
-                //right = tex2D(_DepthTexture, frag.screen.xy + float2(1.0, 0.0));
-                //down = tex2D(_DepthTexture, frag.screen.xy + float2(0.0, -1.0));
-                //left = tex2D(_DepthTexture, frag.screen.xy + float2(-1.0, 0.0));
+                //return color;
 
-                //float verticalMinimumAO = (up + down) / 2;
-                //float lateralMinimumAO = (right + left) / 2;
+                float depth = tex2D(_DepthTexture, frag.screen.xy);
 
-                //if (origin > verticalMinimumAO)
-                //{
-                //    color.rgb -= (1.0 - verticalMinimumAO) * _AOIntensity;
-                //}
-
-                float origin = tex2D(_DepthTexture, frag.screen.xy);
-
-                if (origin == 0.0)
+                if (depth == 0.0)
                 {
                     discard;
                 }
 
-                return origin;
+                return depth;
             }
 
             ENDCG

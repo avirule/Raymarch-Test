@@ -18,6 +18,8 @@ using UnityEngine;
 /// </summary>
 public class FreeCam : MonoBehaviour
 {
+    public Camera Camera;
+
     /// <summary>
     ///     Set to true when free looking (on right mouse button).
     /// </summary>
@@ -47,6 +49,11 @@ public class FreeCam : MonoBehaviour
     ///     Amount to zoom the camera when using the mouse wheel.
     /// </summary>
     public float ZoomSensitivity = 10f;
+
+    private void Start()
+    {
+        Camera.depthTextureMode = DepthTextureMode.Depth;
+    }
 
     private void Update()
     {

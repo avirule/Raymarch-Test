@@ -290,6 +290,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b224f19cb3704031b9d962ce184e0a10, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  Camera: {fileID: 963194227}
   FastMovementSpeed: 100
   FastZoomSensitivity: 50
   FreeLookSensitivity: 3
