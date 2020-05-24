@@ -82,6 +82,7 @@
     Properties
     {
         _RaymarchTexture ("Raymarch Texture", 3D) = "white" {}
+        _DepthTexture ("Depth Texture", 2D) = "white" {}
         _Epsilon ("Epsilon", Range(0.00001, 0.025)) = 0.0005
         _AOIntensity ("AO Intensity", Range(0.0, 1.0)) = 0.5
     }
@@ -89,11 +90,14 @@
     SubShader
     {
         Tags { "RenderType"="Opaque" }
-        Cull Off
+        Cull Front
         LOD 100
 
         Pass
         {
+            ZWrite Off
+            ZTest Always
+
             CGPROGRAM
 
             #pragma vertex vert
@@ -129,7 +133,9 @@
             {
                 float3 rayDirection = normalize(frag.rayDestination - frag.rayOrigin);
                 frag.rayOrigin += rayDirection * _ProjectionParams.y;
-                return raymarchDepth(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
+                float depth = raymarchDepth(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
+
+                return depth;
             }
 
             ENDCG
@@ -153,10 +159,10 @@
                 float4 clip : SV_POSITION;
                 float3 rayOrigin : TEXCOORD0;
                 float3 rayDestination : TEXCOORD1;
-                float2 screen : TEXCOORD2;
+                float4 screen : TEXCOORD2;
             };
 
-            uniform sampler2D_float _DepthTexture;
+            uniform sampler2D _DepthTexture;
             uniform sampler3D _RaymarchTexture;
             uniform float _Epsilon;
             uniform int _AOIntensity;
@@ -173,6 +179,7 @@
 
             fixed4 frag(v2f frag) : SV_TARGET
             {
+                float2 screen = frag.screen.xy / frag.screen.w;
                 float3 rayDirection = normalize(frag.rayDestination - frag.rayOrigin);
                 frag.rayOrigin += rayDirection * _ProjectionParams.y;
                 fixed4 color = raymarchColor(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
@@ -182,16 +189,14 @@
                     discard;
                 }
 
-                return color;
-
-                //float depth = tex2D(_DepthTexture, frag.screen.xy);
+                float depth = tex2D(_DepthTexture, screen).r;
 
                 //if (depth == 0.0)
                 //{
                 //    discard;
                 //}
 
-                //return depth;
+                return depth;
             }
 
             ENDCG
