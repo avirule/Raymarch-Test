@@ -84,7 +84,9 @@
         _RaymarchTexture ("Raymarch Texture", 3D) = "white" {}
         _DepthTexture ("Depth Texture", 2D) = "white" {}
         _Epsilon ("Epsilon", Range(0.00001, 0.025)) = 0.0005
-        _AOIntensity ("AO Intensity", Range(0.0, 1.0)) = 0.5
+        _AOIntensity ("AO Intensity", Range(0.0, 10.0)) = 0.5
+        _AOGrade ("AO Grade", Range(0.0, 50.0)) = 2.0
+        _AORange ("AO Range", Range(0.0, 1.0)) = 0.1
     }
 
     SubShader
@@ -133,9 +135,7 @@
             {
                 float3 rayDirection = normalize(frag.rayDestination - frag.rayOrigin);
                 frag.rayOrigin += rayDirection * _ProjectionParams.y;
-                float depth = raymarchDepth(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
-
-                return depth;
+                return raymarchDepth(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
             }
 
             ENDCG
@@ -162,10 +162,12 @@
                 float4 screen : TEXCOORD2;
             };
 
-            uniform sampler2D _DepthTexture;
+            uniform sampler2D_float _DepthTexture;
             uniform sampler3D _RaymarchTexture;
             uniform float _Epsilon;
-            uniform int _AOIntensity;
+            uniform float _AOIntensity;
+            uniform float _AOGrade;
+            uniform float _AORange;
 
             v2f vert(appdata vert)
             {
@@ -182,20 +184,30 @@
                 float2 screen = frag.screen.xy / frag.screen.w;
                 float3 rayDirection = normalize(frag.rayDestination - frag.rayOrigin);
                 frag.rayOrigin += rayDirection * _ProjectionParams.y;
-                fixed4 color = raymarchColor(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
 
-                if (color.a < 1.0)
+                fixed4 color = raymarchColor(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
+                float depth = tex2D(_DepthTexture, screen);
+
+                if (color.a < 1.0 || depth == 0.0)
                 {
                     discard;
                 }
 
-                float depth = tex2D(_DepthTexture, screen).r;
+                //float2 rawScreen = screen * _ScreenParams.xy;
+                //float up = tex2D(_DepthTexture, (rawScreen + float2(0.0, 1.0)) / _ScreenParams.xy) - depth;
+                //float right = tex2D(_DepthTexture, (rawScreen + float2(1.0, 0.0)) / _ScreenParams.xy) - depth;
+                //float down = tex2D(_DepthTexture, (rawScreen + float2(0.0, -1.0)) / _ScreenParams.xy) - depth;
+                //float left = tex2D(_DepthTexture, (rawScreen + float2(-1.0, 0.0)) / _ScreenParams.xy) - depth;
+                //float averageDepth = (up + right + down + left) / 4.0;
+                //float verticalAO = (1.0 - (abs(depth - up) + abs(depth - down))) * _AOIntensity;
+                //float horizontalAO = (1.0 - (abs(depth - right) + abs(depth - left))) * _AOIntensity;
 
-                //if (depth == 0.0)
-                //{
-                //    discard;
-                //}
+                //fixed4 minColor = color;
+                //minColor -= _AORange;
+                //fixed4 maxColor = color;
+                //maxColor.rgb += _AORange;
 
+                //return clamp(color - (((verticalAO + horizontalAO) / 2.0) * _AOGrade), minColor, maxColor);
                 return depth;
             }
 
