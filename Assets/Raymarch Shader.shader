@@ -89,13 +89,11 @@
     SubShader
     {
         Tags { "RenderType"="Opaque" }
-        Blend Off
-        Cull Front
+        Cull Off
         LOD 100
 
         Pass
         {
-            ZTest Always
             CGPROGRAM
 
             #pragma vertex vert
@@ -158,7 +156,7 @@
                 float2 screen : TEXCOORD2;
             };
 
-            uniform sampler2D _DepthTexture;
+            uniform sampler2D_float _DepthTexture;
             uniform sampler3D _RaymarchTexture;
             uniform float _Epsilon;
             uniform int _AOIntensity;
@@ -175,26 +173,25 @@
 
             fixed4 frag(v2f frag) : SV_TARGET
             {
-                //float3 rayDirection = normalize(frag.rayDestination - frag.rayOrigin);
-                //frag.rayOrigin += rayDirection * _ProjectionParams.y;
+                float3 rayDirection = normalize(frag.rayDestination - frag.rayOrigin);
+                frag.rayOrigin += rayDirection * _ProjectionParams.y;
+                fixed4 color = raymarchColor(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
 
-                //fixed4 color = raymarchColor(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
-
-                //if (color.a < 1.0)
-                //{
-                //    discard;
-                //}
-
-                //return color;
-
-                float depth = tex2D(_DepthTexture, frag.screen.xy);
-
-                if (depth == 0.0)
+                if (color.a < 1.0)
                 {
                     discard;
                 }
 
-                return depth;
+                return color;
+
+                //float depth = tex2D(_DepthTexture, frag.screen.xy);
+
+                //if (depth == 0.0)
+                //{
+                //    discard;
+                //}
+
+                //return depth;
             }
 
             ENDCG

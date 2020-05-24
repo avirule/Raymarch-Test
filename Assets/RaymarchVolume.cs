@@ -3,8 +3,10 @@
 using System;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEditor.U2D;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 using Random = System.Random;
 
 #endregion
@@ -14,16 +16,16 @@ public class RaymarchVolume : MonoBehaviour
     private const int _GRID_SIZE = 32;
 
     private static readonly int _RaymarchTextureKernel = Shader.PropertyToID("_RaymarchTexture");
-
-    private short[] _Blocks;
-
-    public Texture3D RaymarchVolumeTexture;
-    public RenderTexture DepthTexture;
-    public Material RaymarchMaterial;
-    public Mesh CubeMesh;
     private static readonly int _DepthTextureKernel = Shader.PropertyToID("_DepthTexture");
 
-    // Start is called before the first frame update
+    private int _CurrentDepthTexture;
+    private short[] _Blocks;
+
+    public Material RaymarchMaterial;
+    public RenderTexture[] DepthTextures;
+    public Texture3D RaymarchVolumeTexture;
+    public Mesh CubeMesh;
+
     private void Start()
     {
         RaymarchVolumeTexture = new Texture3D(_GRID_SIZE, _GRID_SIZE, _GRID_SIZE, GraphicsFormat.R32G32B32A32_SFloat, TextureCreationFlags.None)
@@ -31,7 +33,11 @@ public class RaymarchVolume : MonoBehaviour
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Point
         };
-        DepthTexture = new RenderTexture(512, 512, 0, RenderTextureFormat.Depth);
+        DepthTextures = new[]
+        {
+            new RenderTexture(512, 512, 0, RenderTextureFormat.Depth),
+            new RenderTexture(512, 512, 0, RenderTextureFormat.Depth)
+        };
 
         Vector3 origin = transform.position * _GRID_SIZE;
         _Blocks = new short[_GRID_SIZE * _GRID_SIZE * _GRID_SIZE];
@@ -57,19 +63,17 @@ public class RaymarchVolume : MonoBehaviour
         RaymarchVolumeTexture.Apply();
 
         RaymarchMaterial.SetTexture(_RaymarchTextureKernel, RaymarchVolumeTexture);
-        RaymarchMaterial.SetTexture(_DepthTextureKernel, DepthTexture);
     }
 
-    private void OnPreRender()
+    private void LateUpdate()
     {
-        RaymarchMaterial.SetPass(0);
-        Graphics.Blit(DepthTexture, RaymarchMaterial);
-    }
+        int newDepthTextureIndex = (_CurrentDepthTexture + 1) % 2;
+        Graphics.Blit(DepthTextures[_CurrentDepthTexture], DepthTextures[newDepthTextureIndex], RaymarchMaterial, 0);
+        RaymarchMaterial.SetTexture(_DepthTextureKernel, DepthTextures[newDepthTextureIndex]);
+        _CurrentDepthTexture = newDepthTextureIndex;
 
-    private void OnRenderObject()
-    {
         RaymarchMaterial.SetPass(1);
-        Graphics.DrawMesh(CubeMesh, Matrix4x4.identity, RaymarchMaterial, 0);
+        Graphics.DrawMesh(CubeMesh, Matrix4x4.identity, RaymarchMaterial, 0, Camera.current, 0, null, ShadowCastingMode.Off, false);
     }
 
     private void MakeJumpTexture()
