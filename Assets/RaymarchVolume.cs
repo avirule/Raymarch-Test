@@ -1,18 +1,20 @@
 ﻿#region
 
 using Unity.Jobs;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using Random = System.Random;
 
 #endregion
 
 public class RaymarchVolume : MonoBehaviour
 {
-    public const int GridSize = 24;
+    public const int GridSize = 32;
     private static readonly int _VoxelGridSize = Shader.PropertyToID("_VoxelGridSize");
     private static readonly int _RaymarchTexture = Shader.PropertyToID("_RaymarchTexture");
 
-    private bool[] _Blocks;
+    private short[] _Blocks;
 
     private Texture3D _Texture;
 
@@ -29,7 +31,7 @@ public class RaymarchVolume : MonoBehaviour
         };
 
         Vector3 origin = transform.position * GridSize;
-        _Blocks = new bool[GridSize * GridSize * GridSize];
+        _Blocks = new short[GridSize * GridSize * GridSize];
 
         int index = 0;
         for (int y = 0; y < GridSize; y++)
@@ -40,9 +42,9 @@ public class RaymarchVolume : MonoBehaviour
                 {
                     Vector3 asOrigin = origin + new Vector3(x, 0f, z);
                     float noise = Mathf.PerlinNoise(asOrigin.x / 1000f, asOrigin.z / 100f);
-                    int noiseHeight = (int)(GridSize * noise);
+                    short noiseHeight = (short)(GridSize * noise);
 
-                    _Blocks[index] = y <= noiseHeight;
+                    _Blocks[index] = y <= noiseHeight ? noiseHeight : (short)-1;
                 }
             }
         }
@@ -61,39 +63,38 @@ public class RaymarchVolume : MonoBehaviour
         JobHandle jobHandle = createTerrainTexture.Schedule(_Blocks.Length, 256);
         jobHandle.Complete();
 
+        Random random = new Random();
+
         int index = 0;
         for (int y = 0; y < GridSize; y++)
         for (int z = 0; z < GridSize; z++)
         for (int x = 0; x < GridSize; x++, index++)
         {
-            byte distance = createTerrainTexture.OutputDistances[index];
 
-            _Texture.SetPixel(x, y, z, distance >= 1f ? Color.white : new Color(0f, 0f, 0f, distance / (float)GridSize));
+            if (_Blocks[index] > -1)
+            {
+                float3 colorNoise = random.Next(-50, 51) * 0.0005f;
 
-            // if (IsSolid(x, y, z))
-            // {
-            //     float3 colorNoise = random.Next(-50, 51) * 0.0005f;
-            //
-            //     if (y == _Blocks[x][y][z])
-            //     {
-            //         float3 color = new float3(0.38f, 0.59f, 0.20f) + colorNoise;
-            //         _Texture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
-            //     }
-            //     else if ((y < _Blocks[x][y][z]) && (y > (_Blocks[x][y][z] - 3)))
-            //     {
-            //         float3 color = new float3(0.36f, 0.25f, 0.2f) + colorNoise;
-            //         _Texture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
-            //     }
-            //     else
-            //     {
-            //         float3 color = new float3(0.41f) + colorNoise;
-            //         _Texture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
-            //     }
-            // }
-            // else
-            // {
-            //     _Texture.SetPixel(x, y, z, new Color(0f, 0f, 0f, FindMaximumJump(x, y, z) / (float)GridSize));
-            // }
+                if (y == _Blocks[index])
+                {
+                    float3 color = new float3(0.38f, 0.59f, 0.20f) + colorNoise;
+                    _Texture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
+                }
+                else if ((y < _Blocks[index]) && (y > (_Blocks[index] - 4)))
+                {
+                    float3 color = new float3(0.36f, 0.25f, 0.2f) + colorNoise;
+                    _Texture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
+                }
+                else
+                {
+                    float3 color = new float3(0.41f) + colorNoise;
+                    _Texture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
+                }
+            }
+            else
+            {
+                _Texture.SetPixel(x, y, z, new Color(0f, 0f, 0f, (float)createTerrainTexture.OutputDistances[index] / (float)GridSize));
+            }
         }
 
         createTerrainTexture.OutputDistances.Dispose();

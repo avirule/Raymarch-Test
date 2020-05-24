@@ -11,7 +11,7 @@ public class CreateFloor : MonoBehaviour
     // Start is called before the first frame update
     private void Start()
     {
-        const int radius = 1;
+        const int radius = 0;
 
         for (int x = -radius; x < (radius + 1); x++)
         for (int z = -radius; z < (radius + 1); z++)
