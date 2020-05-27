@@ -188,26 +188,11 @@
                 fixed4 color = raymarchColor(_RaymarchTexture, _Epsilon, frag.rayOrigin, rayDirection);
                 float depth = tex2D(_DepthTexture, screen);
 
-                if (color.a < 1.0 || depth == 0.0)
+                if (color.a < 1.0)
                 {
                     discard;
                 }
 
-                //float2 rawScreen = screen * _ScreenParams.xy;
-                //float up = tex2D(_DepthTexture, (rawScreen + float2(0.0, 1.0)) / _ScreenParams.xy) - depth;
-                //float right = tex2D(_DepthTexture, (rawScreen + float2(1.0, 0.0)) / _ScreenParams.xy) - depth;
-                //float down = tex2D(_DepthTexture, (rawScreen + float2(0.0, -1.0)) / _ScreenParams.xy) - depth;
-                //float left = tex2D(_DepthTexture, (rawScreen + float2(-1.0, 0.0)) / _ScreenParams.xy) - depth;
-                //float averageDepth = (up + right + down + left) / 4.0;
-                //float verticalAO = (1.0 - (abs(depth - up) + abs(depth - down))) * _AOIntensity;
-                //float horizontalAO = (1.0 - (abs(depth - right) + abs(depth - left))) * _AOIntensity;
-
-                //fixed4 minColor = color;
-                //minColor -= _AORange;
-                //fixed4 maxColor = color;
-                //maxColor.rgb += _AORange;
-
-                //return clamp(color - (((verticalAO + horizontalAO) / 2.0) * _AOGrade), minColor, maxColor);
                 return color;
             }
 

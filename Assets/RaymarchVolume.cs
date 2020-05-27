@@ -10,7 +10,7 @@ using Debug = UnityEngine.Debug;
 
 public class RaymarchVolume : MonoBehaviour
 {
-    private const int _GRID_SIZE = 12;
+    private const int _GRID_SIZE = 256;
     private const int _GRID_SIZE_CUBED = _GRID_SIZE * _GRID_SIZE * _GRID_SIZE;
     private const int _DEPTH_TEXTURE_SCALING_FACTOR = 2;
     private const float _FREQUENCY = 0.0075f;
@@ -19,6 +19,7 @@ public class RaymarchVolume : MonoBehaviour
     private static readonly int _RandomSamplerTexture = Shader.PropertyToID("_RandomSamplerTexture");
     private static readonly int _RaymarchTextureKernel = Shader.PropertyToID("_RaymarchTexture");
     private static readonly int _DepthTextureKernel = Shader.PropertyToID("_DepthTexture");
+    private static readonly int _EpsilonKernel = Shader.PropertyToID("_Epsilon");
 
     private int _Seed;
 
@@ -27,6 +28,10 @@ public class RaymarchVolume : MonoBehaviour
     public Texture3D RaymarchVolumeTexture;
     public Texture2D RandomSamplerTexture;
     public Mesh CubeMesh;
+
+    [Range(0f, 100f)]
+    public float EpsilonAccordanceFactor = 1f;
+    public bool Regenerate = true;
 
     private void Start()
     {
@@ -37,7 +42,7 @@ public class RaymarchVolume : MonoBehaviour
             filterMode = FilterMode.Point,
             antiAliasing = 2
         };
-        RaymarchVolumeTexture = new Texture3D(_GRID_SIZE, _GRID_SIZE, _GRID_SIZE, GraphicsFormat.R8G8B8A8_SRGB, TextureCreationFlags.None)
+        RaymarchVolumeTexture = new Texture3D(_GRID_SIZE, _GRID_SIZE, _GRID_SIZE, GraphicsFormat.R32G32B32A32_SFloat, TextureCreationFlags.None)
         {
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Point
@@ -60,24 +65,16 @@ public class RaymarchVolume : MonoBehaviour
         RaymarchMaterial.SetTexture(_RandomSamplerTexture, RandomSamplerTexture);
 
         _Seed = "afffakka".GetHashCode();
+    }
 
-        Stopwatch stopwatch = Stopwatch.StartNew();
+    private void Update()
+    {
+        if (Regenerate)
+        {
+            Generate();
 
-        CreateWorldDataJob createWorldDataJob = new CreateWorldDataJob(_GRID_SIZE, _Seed, _FREQUENCY, _PERSISTENCE);
-        JobHandle worldDataJobHandle = createWorldDataJob.Schedule(_GRID_SIZE_CUBED, 64);
-
-        CreateRaymarchTextureJob createRaymarchTextureJob = new CreateRaymarchTextureJob((uint)_Seed, _GRID_SIZE, createWorldDataJob.WorldData);
-        createRaymarchTextureJob.Schedule(_GRID_SIZE_CUBED, 64, worldDataJobHandle).Complete();
-
-        RaymarchVolumeTexture.SetPixelData(createRaymarchTextureJob.OutputDistances, 0);
-        RaymarchVolumeTexture.Apply();
-
-        createRaymarchTextureJob.OutputDistances.Dispose();
-        createRaymarchTextureJob.Blocks.Dispose();
-
-        RaymarchMaterial.SetTexture(_RaymarchTextureKernel, RaymarchVolumeTexture);
-
-        Debug.Log($"{stopwatch.Elapsed.TotalMilliseconds:0.00}ms");
+            Regenerate = false;
+        }
     }
 
     private void OnRenderObject()
@@ -100,5 +97,27 @@ public class RaymarchVolume : MonoBehaviour
             Graphics.SetRenderTarget(previousRenderTarget);
             Graphics.DrawMeshNow(CubeMesh, Matrix4x4.identity, 0);
         }
+    }
+
+    private void Generate()
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
+        CreateWorldDataJob createWorldDataJob = new CreateWorldDataJob(_GRID_SIZE, _Seed, _FREQUENCY, _PERSISTENCE);
+        JobHandle worldDataJobHandle = createWorldDataJob.Schedule(_GRID_SIZE_CUBED, 64);
+
+        CreateRaymarchTextureJob createRaymarchTextureJob = new CreateRaymarchTextureJob((uint)_Seed, _GRID_SIZE, createWorldDataJob.WorldData,
+            RaymarchMaterial.GetFloat(_EpsilonKernel), EpsilonAccordanceFactor);
+        createRaymarchTextureJob.Schedule(_GRID_SIZE_CUBED, 64, worldDataJobHandle).Complete();
+
+        RaymarchVolumeTexture.SetPixelData(createRaymarchTextureJob.OutputDistances, 0);
+        RaymarchVolumeTexture.Apply();
+
+        createRaymarchTextureJob.OutputDistances.Dispose();
+        createRaymarchTextureJob.Blocks.Dispose();
+
+        RaymarchMaterial.SetTexture(_RaymarchTextureKernel, RaymarchVolumeTexture);
+
+        Debug.Log($"{stopwatch.Elapsed.TotalMilliseconds:0.00}ms");
     }
 }

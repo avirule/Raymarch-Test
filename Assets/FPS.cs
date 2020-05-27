@@ -1,5 +1,6 @@
 ﻿#region
 
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,7 +9,7 @@ using UnityEngine.UI;
 public class FPS : MonoBehaviour
 {
     private int skippedUpdates;
-    public Text TextObject;
+    public TextMeshProUGUI TextObject;
 
     // Start is called before the first frame update
     private void Start() { }
@@ -16,7 +17,7 @@ public class FPS : MonoBehaviour
     // Update is called once per frame
     private void Update()
     {
-        if (skippedUpdates == 4)
+        if (skippedUpdates == 8)
         {
             skippedUpdates = 0;
 

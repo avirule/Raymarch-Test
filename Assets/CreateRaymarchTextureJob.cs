@@ -13,6 +13,8 @@ using Random = Unity.Mathematics.Random;
 public struct CreateRaymarchTextureJob : IJobParallelFor
 {
     private readonly int _GridSize;
+    private readonly float _Epsilon;
+    private readonly float _EpsilonAccordanceFactor;
 
     private Random _Random;
 
@@ -21,10 +23,14 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
 
     public NativeArray<Color> OutputDistances;
 
-    public CreateRaymarchTextureJob(uint seed, int gridSize, NativeArray<short> blocks)
+    public CreateRaymarchTextureJob(uint seed, int gridSize, NativeArray<short> blocks, float epsilon, float epsilonAccordanceFactor)
     {
         _GridSize = gridSize;
+        _Epsilon = epsilon;
+        _EpsilonAccordanceFactor = epsilonAccordanceFactor;
+
         _Random = new Random(seed);
+
         Blocks = blocks;
         OutputDistances = new NativeArray<Color>(blocks.Length, Allocator.TempJob);
     }
@@ -35,7 +41,7 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
 
         if (Blocks[index] > -1)
         {
-            float colorNoise = _Random.NextFloat(-0.005f, 0.005f);
+            float colorNoise = _Random.NextFloat(-0.05f, 0.05f);
 
             if (coords.y == Blocks[index])
             {
@@ -44,18 +50,18 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
             }
             else if ((coords.y < Blocks[index]) && (coords.y > (Blocks[index] - 4)))
             {
-                float3 color = new float3(0.41f) + colorNoise;
+                float3 color = new float3(0.36f, 0.25f, 0.2f) + colorNoise;
                 OutputDistances[index] = new Color(color.x, color.y, color.z, 1f);
             }
             else
             {
-                float3 color = new float3(105) + colorNoise;
+                float3 color = new float3(0.41f) + colorNoise;
                 OutputDistances[index] = new Color(color.x, color.y, color.z, 1f);
             }
         }
         else
         {
-            OutputDistances[index] = new Color(0f, 0f, 0f, FindMaximumJump(coords) / (float)_GridSize);
+            OutputDistances[index] = new Color(0f, 0f, 0f, (FindMaximumJump(coords) / (float)_GridSize) - (_Epsilon * _EpsilonAccordanceFactor));
         }
     }
 
@@ -63,7 +69,10 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
     {
         int jumpSize = 0;
 
-        while ((jumpSize < _GridSize) && IsBoundingBoxEmpty(coords - (jumpSize + 1), coords + (jumpSize + 1)))
+        while ((jumpSize < _GridSize)
+               && IsBoundingBoxEmpty(
+                   math.clamp(coords - (jumpSize + 1), 0, _GridSize),
+                   math.clamp(coords + (jumpSize + 1), 0, _GridSize)))
         {
             jumpSize += 1;
         }
@@ -73,29 +82,20 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
 
     private bool IsBoundingBoxEmpty(int3 start, int3 end)
     {
+        int index = 0;
         int3 coords;
-
         for (coords.x = start.x; coords.x <= end.x; coords.x += 1)
         for (coords.y = start.y; coords.y <= end.y; coords.y += 1)
-        for (coords.z = start.z; coords.z <= end.z; coords.z += 1)
+        for (coords.z = start.z; coords.z <= end.z; coords.z += 1, index++)
         {
-            if (IsBlockSolid(coords))
+            if (IsBlockSolid(index))
             {
                 return false;
             }
         }
 
-
         return true;
     }
 
-    private bool IsBlockSolid(int3 coords)
-    {
-        int index = StaticMath.Project1D_XYZ(coords, _GridSize);
-        return math.all(coords >= 0)
-               && math.all(coords < _GridSize)
-               && (index >= 0)
-               && (index < Blocks.Length)
-               && (Blocks[index] > -1);
-    }
+    private bool IsBlockSolid(int index) => Blocks[index] > -1;
 }
