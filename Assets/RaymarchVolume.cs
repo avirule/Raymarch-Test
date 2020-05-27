@@ -1,17 +1,16 @@
 ﻿#region
 
-using System;
-using System.Runtime.CompilerServices;
+using System.Diagnostics;
 using Unity.Jobs;
-using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using Debug = UnityEngine.Debug;
 
 #endregion
 
 public class RaymarchVolume : MonoBehaviour
 {
-    private const int _GRID_SIZE = 3;
+    private const int _GRID_SIZE = 12;
     private const int _GRID_SIZE_CUBED = _GRID_SIZE * _GRID_SIZE * _GRID_SIZE;
     private const int _DEPTH_TEXTURE_SCALING_FACTOR = 2;
     private const float _FREQUENCY = 0.0075f;
@@ -38,7 +37,7 @@ public class RaymarchVolume : MonoBehaviour
             filterMode = FilterMode.Point,
             antiAliasing = 2
         };
-        RaymarchVolumeTexture = new Texture3D(_GRID_SIZE, _GRID_SIZE, _GRID_SIZE, GraphicsFormat.R32G32B32A32_SFloat, TextureCreationFlags.None)
+        RaymarchVolumeTexture = new Texture3D(_GRID_SIZE, _GRID_SIZE, _GRID_SIZE, GraphicsFormat.R8G8B8A8_SRGB, TextureCreationFlags.None)
         {
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Point
@@ -62,6 +61,8 @@ public class RaymarchVolume : MonoBehaviour
 
         _Seed = "afffakka".GetHashCode();
 
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
         CreateWorldDataJob createWorldDataJob = new CreateWorldDataJob(_GRID_SIZE, _Seed, _FREQUENCY, _PERSISTENCE);
         JobHandle worldDataJobHandle = createWorldDataJob.Schedule(_GRID_SIZE_CUBED, 64);
 
@@ -75,6 +76,8 @@ public class RaymarchVolume : MonoBehaviour
         createRaymarchTextureJob.Blocks.Dispose();
 
         RaymarchMaterial.SetTexture(_RaymarchTextureKernel, RaymarchVolumeTexture);
+
+        Debug.Log($"{stopwatch.Elapsed.TotalMilliseconds:0.00}ms");
     }
 
     private void OnRenderObject()
