@@ -34,12 +34,11 @@ public struct CreateWorldDataJob : IJobParallelFor
 
     public void Execute(int index)
     {
-        StaticMath.Project3D_XYZ(index, _GridSize, out int x, out int y, out int z);
-        int3 localPosition = new int3(x, y, z);
-        float osplxNoise = GetHeightByGlobalPosition(localPosition.xz);
-        short noiseHeight = (short)osplxNoise;
+        StaticMath.Project3D_XYZ(index, _GridSize, out int3 localPosition);
+        float simplexNoise = GetHeightByGlobalPosition(localPosition.xz);
+        short noiseHeight = (short)simplexNoise;
 
-        if ((y > noiseHeight) || (GetCaveNoiseByGlobalPosition(new int3(x, y, z)) < 0.000225f))
+        if ((localPosition.y > noiseHeight) || (GetCaveNoiseByGlobalPosition(localPosition) < 0.000225f))
         {
             WorldData[index] = -1;
         }
