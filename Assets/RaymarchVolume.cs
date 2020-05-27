@@ -1,36 +1,34 @@
 ﻿#region
 
 using Unity.Jobs;
-using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
-using Random = System.Random;
 
 #endregion
 
 public class RaymarchVolume : MonoBehaviour
 {
-    private const int _GRID_SIZE = 32;
+    private const int _GRID_SIZE = 128;
     private const int _DEPTH_TEXTURE_RESOLUTION = 512;
     private const int _DEPTH_TEXTURE_RESOLUTION_DOWNSCALING = 2;
+    private const float _FREQUENCY = 0.0075f;
+    private const float _PERSISTENCE = 0.6f;
 
     private static readonly int _RaymarchTextureKernel = Shader.PropertyToID("_RaymarchTexture");
     private static readonly int _DepthTextureKernel = Shader.PropertyToID("_DepthTexture");
 
+    private int _Seed;
     private short[] _Blocks;
 
     public Material RaymarchMaterial;
     public RenderTexture DepthTexture;
     public Texture3D RaymarchVolumeTexture;
+    public Texture2D RandomSamplerTexture;
     public Mesh CubeMesh;
+    private static readonly int _RandomSamplerTexture = Shader.PropertyToID("_RandomSamplerTexture");
 
     private void Start()
     {
-        RaymarchVolumeTexture = new Texture3D(_GRID_SIZE, _GRID_SIZE, _GRID_SIZE, GraphicsFormat.R32G32B32A32_SFloat, TextureCreationFlags.None)
-        {
-            wrapMode = TextureWrapMode.Clamp,
-            filterMode = FilterMode.Point
-        };
         DepthTexture = new RenderTexture(Screen.currentResolution.width / _DEPTH_TEXTURE_RESOLUTION_DOWNSCALING,
             Screen.currentResolution.height / _DEPTH_TEXTURE_RESOLUTION_DOWNSCALING, 0, RenderTextureFormat.RFloat)
         {
@@ -38,30 +36,40 @@ public class RaymarchVolume : MonoBehaviour
             filterMode = FilterMode.Point,
             antiAliasing = 2
         };
+        RaymarchVolumeTexture = new Texture3D(_GRID_SIZE, _GRID_SIZE, _GRID_SIZE, GraphicsFormat.R32G32B32A32_SFloat, TextureCreationFlags.None)
+        {
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Point
+        };
+        RandomSamplerTexture = new Texture2D(Screen.currentResolution.width / _DEPTH_TEXTURE_RESOLUTION_DOWNSCALING,
+            Screen.currentResolution.height / _DEPTH_TEXTURE_RESOLUTION_DOWNSCALING, TextureFormat.RFloat, false)
+        {
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Point
+        };
 
-        Vector3 origin = transform.position * _GRID_SIZE;
+        for (int x = 0; x < RandomSamplerTexture.width; x++)
+        for (int z = 0; z < RandomSamplerTexture.height; z++)
+        {
+            float noise = Mathf.Pow(Mathf.PerlinNoise(x / (float)RandomSamplerTexture.width, z / (float)RandomSamplerTexture.height), 0.986f);
+            RandomSamplerTexture.SetPixel(x, z, new Color(noise, 0f, 0f, 1f));
+        }
+
+        RandomSamplerTexture.Apply();
+        RaymarchMaterial.SetTexture(_RandomSamplerTexture, RandomSamplerTexture);
+
         _Blocks = new short[_GRID_SIZE * _GRID_SIZE * _GRID_SIZE];
 
-        int index = 0;
-        for (int y = 0; y < _GRID_SIZE; y++)
-        {
-            for (int z = 0; z < _GRID_SIZE; z++)
-            {
-                for (int x = 0; x < _GRID_SIZE; x++, index++)
-                {
-                    Vector3 asOrigin = origin + new Vector3(x, 0f, z);
-                    float noise = Mathf.PerlinNoise(asOrigin.x / 1000f, asOrigin.z / 100f);
-                    short noiseHeight = (short)(_GRID_SIZE * noise);
+        _Seed = "afffakka".GetHashCode();
 
-                    _Blocks[index] = y <= noiseHeight ? noiseHeight : (short)-1;
-                }
-            }
-        }
+        CreateWorldDataJob createWorldDataJob = new CreateWorldDataJob(_GRID_SIZE, _Seed, _FREQUENCY, _PERSISTENCE);
+        createWorldDataJob.Schedule(_Blocks.Length, 64).Complete();
+        createWorldDataJob.WorldData.CopyTo(_Blocks);
+        createWorldDataJob.WorldData.Dispose();
 
         MakeJumpTexture();
 
         RaymarchVolumeTexture.Apply();
-
         RaymarchMaterial.SetTexture(_RaymarchTextureKernel, RaymarchVolumeTexture);
     }
 
@@ -89,44 +97,13 @@ public class RaymarchVolume : MonoBehaviour
 
     private void MakeJumpTexture()
     {
-        CreateTerrainTexture createTerrainTexture = new CreateTerrainTexture(_GRID_SIZE, _Blocks);
-        JobHandle jobHandle = createTerrainTexture.Schedule(_Blocks.Length, 256);
+        CreateJumpTextureJob createJumpTextureJob = new CreateJumpTextureJob((uint)_Seed, _GRID_SIZE, _Blocks);
+        JobHandle jobHandle = createJumpTextureJob.Schedule(_Blocks.Length, 64);
         jobHandle.Complete();
 
-        Random random = new Random();
+        RaymarchVolumeTexture.SetPixelData(createJumpTextureJob.OutputDistances, 0);
 
-        int index = 0;
-        for (int y = 0; y < _GRID_SIZE; y++)
-        for (int z = 0; z < _GRID_SIZE; z++)
-        for (int x = 0; x < _GRID_SIZE; x++, index++)
-        {
-            if (_Blocks[index] > -1)
-            {
-                float3 colorNoise = random.Next(-50, 51) * 0.0005f;
-
-                if (y == _Blocks[index])
-                {
-                    float3 color = new float3(0.38f, 0.59f, 0.20f) + colorNoise;
-                    RaymarchVolumeTexture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
-                }
-                else if ((y < _Blocks[index]) && (y > (_Blocks[index] - 4)))
-                {
-                    float3 color = new float3(0.36f, 0.25f, 0.2f) + colorNoise;
-                    RaymarchVolumeTexture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
-                }
-                else
-                {
-                    float3 color = new float3(0.41f) + colorNoise;
-                    RaymarchVolumeTexture.SetPixel(x, y, z, new Color(color.x, color.y, color.z, 1f));
-                }
-            }
-            else
-            {
-                RaymarchVolumeTexture.SetPixel(x, y, z, new Color(0f, 0f, 0f, createTerrainTexture.OutputDistances[index] / (float)_GRID_SIZE));
-            }
-        }
-
-        createTerrainTexture.OutputDistances.Dispose();
-        createTerrainTexture.Blocks.Dispose();
+        createJumpTextureJob.OutputDistances.Dispose();
+        createJumpTextureJob.Blocks.Dispose();
     }
 }

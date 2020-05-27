@@ -208,7 +208,7 @@
                 //maxColor.rgb += _AORange;
 
                 //return clamp(color - (((verticalAO + horizontalAO) / 2.0) * _AOGrade), minColor, maxColor);
-                return depth;
+                return color;
             }
 
             ENDCG
