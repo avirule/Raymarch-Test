@@ -1,6 +1,9 @@
 ﻿#region
 
+using System;
+using System.Runtime.CompilerServices;
 using Unity.Jobs;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 
@@ -8,7 +11,8 @@ using UnityEngine.Experimental.Rendering;
 
 public class RaymarchVolume : MonoBehaviour
 {
-    private const int _GRID_SIZE = 12;
+    private const int _GRID_SIZE = 3;
+    private const int _GRID_SIZE_CUBED = _GRID_SIZE * _GRID_SIZE * _GRID_SIZE;
     private const int _DEPTH_TEXTURE_SCALING_FACTOR = 2;
     private const float _FREQUENCY = 0.0075f;
     private const float _PERSISTENCE = 0.6f;
@@ -18,7 +22,6 @@ public class RaymarchVolume : MonoBehaviour
     private static readonly int _DepthTextureKernel = Shader.PropertyToID("_DepthTexture");
 
     private int _Seed;
-    private short[] _Blocks;
 
     public Material RaymarchMaterial;
     public RenderTexture DepthTexture;
@@ -57,18 +60,20 @@ public class RaymarchVolume : MonoBehaviour
         RandomSamplerTexture.Apply();
         RaymarchMaterial.SetTexture(_RandomSamplerTexture, RandomSamplerTexture);
 
-        _Blocks = new short[_GRID_SIZE * _GRID_SIZE * _GRID_SIZE];
-
         _Seed = "afffakka".GetHashCode();
 
         CreateWorldDataJob createWorldDataJob = new CreateWorldDataJob(_GRID_SIZE, _Seed, _FREQUENCY, _PERSISTENCE);
-        createWorldDataJob.Schedule(_Blocks.Length, 64).Complete();
-        createWorldDataJob.WorldData.CopyTo(_Blocks);
-        createWorldDataJob.WorldData.Dispose();
+        JobHandle worldDataJobHandle = createWorldDataJob.Schedule(_GRID_SIZE_CUBED, 64);
 
-        MakeJumpTexture();
+        CreateRaymarchTextureJob createRaymarchTextureJob = new CreateRaymarchTextureJob((uint)_Seed, _GRID_SIZE, createWorldDataJob.WorldData);
+        createRaymarchTextureJob.Schedule(_GRID_SIZE_CUBED, 64, worldDataJobHandle).Complete();
 
+        RaymarchVolumeTexture.SetPixelData(createRaymarchTextureJob.OutputDistances, 0);
         RaymarchVolumeTexture.Apply();
+
+        createRaymarchTextureJob.OutputDistances.Dispose();
+        createRaymarchTextureJob.Blocks.Dispose();
+
         RaymarchMaterial.SetTexture(_RaymarchTextureKernel, RaymarchVolumeTexture);
     }
 
@@ -92,17 +97,5 @@ public class RaymarchVolume : MonoBehaviour
             Graphics.SetRenderTarget(previousRenderTarget);
             Graphics.DrawMeshNow(CubeMesh, Matrix4x4.identity, 0);
         }
-    }
-
-    private void MakeJumpTexture()
-    {
-        CreateJumpTextureJob createJumpTextureJob = new CreateJumpTextureJob((uint)_Seed, _GRID_SIZE, _Blocks);
-        JobHandle jobHandle = createJumpTextureJob.Schedule(_Blocks.Length, 64);
-        jobHandle.Complete();
-
-        RaymarchVolumeTexture.SetPixelData(createJumpTextureJob.OutputDistances, 0);
-
-        createJumpTextureJob.OutputDistances.Dispose();
-        createJumpTextureJob.Blocks.Dispose();
     }
 }

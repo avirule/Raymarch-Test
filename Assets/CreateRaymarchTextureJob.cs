@@ -1,6 +1,5 @@
 #region
 
-using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -10,7 +9,7 @@ using Random = Unity.Mathematics.Random;
 #endregion
 
 //[BurstCompile]
-public struct CreateJumpTextureJob : IJobParallelFor
+public struct CreateRaymarchTextureJob : IJobParallelFor
 {
     private readonly int _GridSize;
 
@@ -21,11 +20,11 @@ public struct CreateJumpTextureJob : IJobParallelFor
 
     public NativeArray<Color> OutputDistances;
 
-    public CreateJumpTextureJob(uint seed, int gridSize, short[] blocks)
+    public CreateRaymarchTextureJob(uint seed, int gridSize, NativeArray<short> blocks)
     {
         _GridSize = gridSize;
         _Random = new Random(seed);
-        Blocks = new NativeArray<short>(blocks, Allocator.TempJob);
+        Blocks = blocks;
         OutputDistances = new NativeArray<Color>(blocks.Length, Allocator.TempJob);
     }
 
@@ -63,12 +62,10 @@ public struct CreateJumpTextureJob : IJobParallelFor
     {
         int jumpSize = 0;
 
-        while (IsBoundingBoxEmpty(coords - (jumpSize + 1), coords + (jumpSize + 1)) && (jumpSize < _GridSize))
+        while ((jumpSize < _GridSize) && IsBoundingBoxEmpty(coords - (jumpSize + 1), coords + (jumpSize + 1)))
         {
             jumpSize += 1;
         }
-
-        Debug.Log(jumpSize / (float)_GridSize);
 
         return jumpSize;
     }
@@ -79,8 +76,7 @@ public struct CreateJumpTextureJob : IJobParallelFor
         for (; start.y <= end.y; start.y += 1)
         for (; start.z <= end.z; start.z += 1)
         {
-            int index = StaticMath.Project1D_XYZ(start, _GridSize);
-            if (IsBlockSolid(index, start))
+            if (IsBlockSolid(StaticMath.Project1D_XYZ(start, _GridSize), start))
             {
                 return false;
             }
