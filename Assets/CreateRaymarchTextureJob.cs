@@ -13,22 +13,18 @@ using Random = Unity.Mathematics.Random;
 public struct CreateRaymarchTextureJob : IJobParallelFor
 {
     private readonly int _GridSize;
-    private readonly float _Epsilon;
-    private readonly float _EpsilonAccordanceFactor;
 
     private Random _Random;
 
     [ReadOnly]
     public NativeArray<short> Blocks;
 
+    [WriteOnly]
     public NativeArray<Color> OutputDistances;
 
-    public CreateRaymarchTextureJob(uint seed, int gridSize, NativeArray<short> blocks, float epsilon, float epsilonAccordanceFactor)
+    public CreateRaymarchTextureJob(uint seed, int gridSize, NativeArray<short> blocks)
     {
         _GridSize = gridSize;
-        _Epsilon = epsilon;
-        _EpsilonAccordanceFactor = epsilonAccordanceFactor;
-
         _Random = new Random(seed);
 
         Blocks = blocks;
@@ -61,7 +57,7 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
         }
         else
         {
-            OutputDistances[index] = new Color(0f, 0f, 0f, (FindMaximumJump(coords) / (float)_GridSize) - (_Epsilon * _EpsilonAccordanceFactor));
+            OutputDistances[index] = new Color(0f, 0f, 0f, FindMaximumJump(coords) / (float)_GridSize);
         }
     }
 

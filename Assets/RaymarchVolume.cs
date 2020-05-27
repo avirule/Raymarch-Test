@@ -10,7 +10,7 @@ using Debug = UnityEngine.Debug;
 
 public class RaymarchVolume : MonoBehaviour
 {
-    private const int _GRID_SIZE = 256;
+    private const int _GRID_SIZE = 128;
     private const int _GRID_SIZE_CUBED = _GRID_SIZE * _GRID_SIZE * _GRID_SIZE;
     private const int _DEPTH_TEXTURE_SCALING_FACTOR = 2;
     private const float _FREQUENCY = 0.0075f;
@@ -19,7 +19,6 @@ public class RaymarchVolume : MonoBehaviour
     private static readonly int _RandomSamplerTexture = Shader.PropertyToID("_RandomSamplerTexture");
     private static readonly int _RaymarchTextureKernel = Shader.PropertyToID("_RaymarchTexture");
     private static readonly int _DepthTextureKernel = Shader.PropertyToID("_DepthTexture");
-    private static readonly int _EpsilonKernel = Shader.PropertyToID("_Epsilon");
 
     private int _Seed;
 
@@ -29,8 +28,6 @@ public class RaymarchVolume : MonoBehaviour
     public Texture2D RandomSamplerTexture;
     public Mesh CubeMesh;
 
-    [Range(0f, 100f)]
-    public float EpsilonAccordanceFactor = 1f;
     public bool Regenerate = true;
 
     private void Start()
@@ -106,8 +103,7 @@ public class RaymarchVolume : MonoBehaviour
         CreateWorldDataJob createWorldDataJob = new CreateWorldDataJob(_GRID_SIZE, _Seed, _FREQUENCY, _PERSISTENCE);
         JobHandle worldDataJobHandle = createWorldDataJob.Schedule(_GRID_SIZE_CUBED, 64);
 
-        CreateRaymarchTextureJob createRaymarchTextureJob = new CreateRaymarchTextureJob((uint)_Seed, _GRID_SIZE, createWorldDataJob.WorldData,
-            RaymarchMaterial.GetFloat(_EpsilonKernel), EpsilonAccordanceFactor);
+        CreateRaymarchTextureJob createRaymarchTextureJob = new CreateRaymarchTextureJob((uint)_Seed, _GRID_SIZE, createWorldDataJob.WorldData);
         createRaymarchTextureJob.Schedule(_GRID_SIZE_CUBED, 64, worldDataJobHandle).Complete();
 
         RaymarchVolumeTexture.SetPixelData(createRaymarchTextureJob.OutputDistances, 0);
