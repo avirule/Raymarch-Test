@@ -92,7 +92,7 @@
     SubShader
     {
         Tags { "RenderType"="Opaque" }
-        Cull Front
+        Cull Off
         LOD 100
 
         Pass

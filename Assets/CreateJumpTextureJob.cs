@@ -1,6 +1,5 @@
 #region
 
-using System;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
@@ -10,7 +9,7 @@ using Random = Unity.Mathematics.Random;
 
 #endregion
 
-[BurstCompile]
+//[BurstCompile]
 public struct CreateJumpTextureJob : IJobParallelFor
 {
     private readonly int _GridSize;
@@ -32,18 +31,18 @@ public struct CreateJumpTextureJob : IJobParallelFor
 
     public void Execute(int index)
     {
-        StaticMath.Project3D_XYZ(index, _GridSize, out int x, out int y, out int z);
+        StaticMath.Project3D_XYZ(index, _GridSize, out int3 coords);
 
         if (Blocks[index] > -1)
         {
             float3 colorNoise = _Random.NextInt(-50, 51) * 0.0005f;
 
-            if (y == Blocks[index])
+            if (coords.y == Blocks[index])
             {
                 float3 color = new float3(0.38f, 0.59f, 0.20f) + colorNoise;
                 OutputDistances[index] = new Color(color.x, color.y, color.z);
             }
-            else if ((y < Blocks[index]) && (y > (Blocks[index] - 4)))
+            else if ((coords.y < Blocks[index]) && (coords.y > (Blocks[index] - 4)))
             {
                 float3 color = new float3(0.36f, 0.25f, 0.2f) + colorNoise;
                 OutputDistances[index] = new Color(color.x, color.y, color.z, 1f);
@@ -56,33 +55,32 @@ public struct CreateJumpTextureJob : IJobParallelFor
         }
         else
         {
-            OutputDistances[index] = new Color(0f, 0f, 0f, FindMaximumJump(x, y, z) / (float)_GridSize);
+            OutputDistances[index] = new Color(0f, 0f, 0f, FindMaximumJump(coords) / (float)_GridSize);
         }
     }
 
-    private int FindMaximumJump(int startX, int startY, int startZ)
+    private int FindMaximumJump(int3 coords)
     {
         int jumpSize = 0;
 
-        while (IsBoundingBoxEmpty(startX - (jumpSize + 1), startY - (jumpSize + 1), startZ - (jumpSize + 1), startX + jumpSize + 1,
-                   startY + jumpSize + 1,
-                   startZ + jumpSize + 1)
-               && (jumpSize < _GridSize))
+        while (IsBoundingBoxEmpty(coords - (jumpSize + 1), coords + (jumpSize + 1)) && (jumpSize < _GridSize))
         {
             jumpSize += 1;
         }
 
+        Debug.Log(jumpSize / (float)_GridSize);
+
         return jumpSize;
     }
 
-    private bool IsBoundingBoxEmpty(int startX, int startY, int startZ, int endX, int endY, int endZ)
+    private bool IsBoundingBoxEmpty(int3 start, int3 end)
     {
-        for (int x = startX; x <= endX; x++)
-        for (int y = startY; y <= endY; y++)
-        for (int z = startZ; z <= endZ; z++)
+        for (; start.x <= end.x; start.x += 1)
+        for (; start.y <= end.y; start.y += 1)
+        for (; start.z <= end.z; start.z += 1)
         {
-            int index = StaticMath.Project1D_XYZ(x, y, z, _GridSize);
-            if (IsBlockSolid(index, x, y, z))
+            int index = StaticMath.Project1D_XYZ(start, _GridSize);
+            if (IsBlockSolid(index, start))
             {
                 return false;
             }
@@ -91,13 +89,9 @@ public struct CreateJumpTextureJob : IJobParallelFor
         return true;
     }
 
-    private bool IsBlockSolid(int index, int x, int y, int z) =>
-        (x >= 0)
-        && (y >= 0)
-        && (z >= 0)
-        && (x < _GridSize)
-        && (y < _GridSize)
-        && (z < _GridSize)
+    private bool IsBlockSolid(int index, int3 coords) =>
+        math.all(coords >= 0)
+        && math.all(coords < _GridSize)
         && (index >= 0)
         && (index < Blocks.Length)
         && (Blocks[index] > -1);

@@ -8,12 +8,12 @@ using UnityEngine.Experimental.Rendering;
 
 public class RaymarchVolume : MonoBehaviour
 {
-    private const int _GRID_SIZE = 128;
-    private const int _DEPTH_TEXTURE_RESOLUTION = 512;
-    private const int _DEPTH_TEXTURE_RESOLUTION_DOWNSCALING = 2;
+    private const int _GRID_SIZE = 12;
+    private const int _DEPTH_TEXTURE_SCALING_FACTOR = 2;
     private const float _FREQUENCY = 0.0075f;
     private const float _PERSISTENCE = 0.6f;
 
+    private static readonly int _RandomSamplerTexture = Shader.PropertyToID("_RandomSamplerTexture");
     private static readonly int _RaymarchTextureKernel = Shader.PropertyToID("_RaymarchTexture");
     private static readonly int _DepthTextureKernel = Shader.PropertyToID("_DepthTexture");
 
@@ -25,12 +25,11 @@ public class RaymarchVolume : MonoBehaviour
     public Texture3D RaymarchVolumeTexture;
     public Texture2D RandomSamplerTexture;
     public Mesh CubeMesh;
-    private static readonly int _RandomSamplerTexture = Shader.PropertyToID("_RandomSamplerTexture");
 
     private void Start()
     {
-        DepthTexture = new RenderTexture(Screen.currentResolution.width / _DEPTH_TEXTURE_RESOLUTION_DOWNSCALING,
-            Screen.currentResolution.height / _DEPTH_TEXTURE_RESOLUTION_DOWNSCALING, 0, RenderTextureFormat.RFloat)
+        DepthTexture = new RenderTexture(Screen.currentResolution.width / _DEPTH_TEXTURE_SCALING_FACTOR,
+            Screen.currentResolution.height / _DEPTH_TEXTURE_SCALING_FACTOR, 0, RenderTextureFormat.RFloat)
         {
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Point,
@@ -41,8 +40,8 @@ public class RaymarchVolume : MonoBehaviour
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Point
         };
-        RandomSamplerTexture = new Texture2D(Screen.currentResolution.width / _DEPTH_TEXTURE_RESOLUTION_DOWNSCALING,
-            Screen.currentResolution.height / _DEPTH_TEXTURE_RESOLUTION_DOWNSCALING, TextureFormat.RFloat, false)
+        RandomSamplerTexture = new Texture2D(Screen.currentResolution.width / _DEPTH_TEXTURE_SCALING_FACTOR,
+            Screen.currentResolution.height / _DEPTH_TEXTURE_SCALING_FACTOR, TextureFormat.RFloat, false)
         {
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Point
