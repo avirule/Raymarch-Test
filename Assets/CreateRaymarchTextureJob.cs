@@ -4,6 +4,8 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine;
+using Random = Unity.Mathematics.Random;
 
 #endregion
 
@@ -26,7 +28,7 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
         _Random = new Random((uint)new int3(0).GetHashCode());
 
         Blocks = blocks;
-        OutputDistances = new NativeArray<float>(blocks.Length, Allocator.TempJob);
+        OutputDistances = new NativeArray<float>(blocks.Length, Allocator.Persistent);
     }
 
     public void Execute(int index)
@@ -51,7 +53,9 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
         }
         else
         {
-            OutputDistances[index] = FindMaximumJump(coords) / (float)_GridSize;
+            float distance = FindMaximumJump(coords) / (float)_GridSize;
+
+            OutputDistances[index] = distance;
         }
     }
 
@@ -61,8 +65,8 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
 
         while ((jumpSize < _GridSize)
                && IsBoundingBoxEmpty(
-                   math.clamp(coords - (jumpSize + 1), 0, _GridSize),
-                   math.clamp(coords + (jumpSize + 1), 0, _GridSize)))
+                   math.clamp(coords - (jumpSize + 1), 0, _GridSize - 1),
+                   math.clamp(coords + (jumpSize + 1), 0, _GridSize - 1)))
         {
             jumpSize += 1;
         }

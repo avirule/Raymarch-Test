@@ -25,7 +25,11 @@ bool cubeRayIntersection(float3 rayOrigin, float3 rayDirection, float3 cubeMinim
 float raymarch(StructuredBuffer<float> accelerationData, int edgeLength, float epsilon, float3 rayOrigin, float3 rayDirection, out float depth)
 {
     float nearIntersectionDistance, farIntersectionDistance;
-    cubeRayIntersection(rayOrigin, rayDirection, -0.5, 0.5, nearIntersectionDistance, farIntersectionDistance);
+
+    if (!cubeRayIntersection(rayOrigin, rayDirection, -0.5, 0.5, nearIntersectionDistance, farIntersectionDistance))
+    {
+        return 0.0;
+    }
 
     // if near intersection is less than zero (we're inside cube), then raycast from zero distance
     nearIntersectionDistance *= (nearIntersectionDistance >= 0.0);
@@ -36,7 +40,8 @@ float raymarch(StructuredBuffer<float> accelerationData, int edgeLength, float e
     [loop]
     while (accumulatedDistance < maximumAccumulatedDistance)
     {
-        int3 hitPosition = int3((rayOrigin + (rayDirection * accumulatedDistance) + 0.5) * edgeLength);
+        float3 accumulatedRay = rayOrigin + (rayDirection * accumulatedDistance) + 0.5;
+        int3 hitPosition = clamp(accumulatedRay * edgeLength, 0.0, edgeLength - 1);
         float jump = accelerationData[project1D(hitPosition, edgeLength)];
 
         if (jump >= 1.0)
@@ -44,8 +49,10 @@ float raymarch(StructuredBuffer<float> accelerationData, int edgeLength, float e
             depth = accumulatedDistance;
             return jump;
         }
-
-        accumulatedDistance += max(epsilon, jump);
+        else
+        {
+            accumulatedDistance += max(epsilon, jump);
+        }
     }
 
     return 0.0;

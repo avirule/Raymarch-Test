@@ -44,9 +44,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Transform: {fileID: 1540894444335955134}
-  RaymarcherMaterial: {fileID: 2100000, guid: 159f83e8b0204fa4688729f71f30ee3a, type: 2}
+  RaymarchMaterial: {fileID: 2100000, guid: 159f83e8b0204fa4688729f71f30ee3a, type: 2}
   DepthTexture: {fileID: 0}
   RandomSamplerTexture: {fileID: 0}
   CubeMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-  GridSize: 16
+  GridSize: 64
   Regenerate: 1

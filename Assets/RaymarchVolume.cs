@@ -1,8 +1,10 @@
 ﻿#region
 
+using System.Collections;
+using System.Diagnostics;
 using Unity.Jobs;
 using UnityEngine;
-using UnityEngine.Experimental.Rendering;
+using Debug = UnityEngine.Debug;
 
 #endregion
 
@@ -18,7 +20,9 @@ public class RaymarchVolume : MonoBehaviour
     private static readonly int _ColorPaletteKernel = Shader.PropertyToID("_ColorPalette");
     private static readonly int _WorldEdgeLengthKernel = Shader.PropertyToID("_WorldEdgeLength");
 
+    private Stopwatch _Stopwatch;
     private int _Seed;
+    private (bool Observe, JobHandle Handle) Observant;
 
     private readonly Color[] _ColorPalette =
     {
@@ -29,7 +33,7 @@ public class RaymarchVolume : MonoBehaviour
     };
 
     public Transform Transform;
-    public Material RaymarcherMaterial;
+    public Material RaymarchMaterial;
     public RenderTexture DepthTexture;
     public Texture2D RandomSamplerTexture;
     public Mesh CubeMesh;
@@ -39,7 +43,10 @@ public class RaymarchVolume : MonoBehaviour
 
     private void Start()
     {
-        RaymarcherMaterial.SetColorArray(_ColorPaletteKernel, _ColorPalette);
+        _Stopwatch = new Stopwatch();
+        _Seed = "afffakka".GetHashCode();
+
+        RaymarchMaterial.SetColorArray(_ColorPaletteKernel, _ColorPalette);
 
         DepthTexture = new RenderTexture(Screen.currentResolution.width / _DEPTH_TEXTURE_SCALING_FACTOR,
             Screen.currentResolution.height / _DEPTH_TEXTURE_SCALING_FACTOR, 0, RenderTextureFormat.RFloat)
@@ -63,9 +70,7 @@ public class RaymarchVolume : MonoBehaviour
         }
 
         RandomSamplerTexture.Apply();
-        RaymarcherMaterial.SetTexture(_RandomSamplerTexture, RandomSamplerTexture);
-
-        _Seed = "afffakka".GetHashCode();
+        RaymarchMaterial.SetTexture(_RandomSamplerTexture, RandomSamplerTexture);
     }
 
     private void Update()
@@ -77,7 +82,7 @@ public class RaymarchVolume : MonoBehaviour
 
         try
         {
-            Generate();
+            StartGenerate();
         }
         finally
         {
@@ -89,37 +94,38 @@ public class RaymarchVolume : MonoBehaviour
     {
         RenderTexture previousRenderTarget = Camera.current.activeTexture;
 
-        if (RaymarcherMaterial.SetPass(0))
+        if (RaymarchMaterial.SetPass(0))
         {
             Graphics.SetRenderTarget(DepthTexture);
 
             GL.Clear(true, true, new Color(0f, 0f, 0f, 0f));
             Graphics.DrawMeshNow(CubeMesh, Matrix4x4.identity);
-            RaymarcherMaterial.SetTexture(_DepthTextureKernel, DepthTexture);
+            RaymarchMaterial.SetTexture(_DepthTextureKernel, DepthTexture);
         }
 
 
-        if (RaymarcherMaterial.SetPass(1))
+        if (RaymarchMaterial.SetPass(1))
         {
             Graphics.SetRenderTarget(previousRenderTarget);
             Graphics.DrawMeshNow(CubeMesh, Transform.position, Transform.rotation);
         }
     }
 
-    private void Generate()
+    private void StartGenerate()
     {
         int gridSizeCubed = GridSize * GridSize * GridSize;
 
         CreateWorldDataJob createWorldDataJob = new CreateWorldDataJob(GridSize, _Seed, _FREQUENCY, _PERSISTENCE);
-        JobHandle worldDataJobHandle = createWorldDataJob.Schedule(gridSizeCubed, 64);
-
         CreateRaymarchTextureJob createRaymarchTextureJob = new CreateRaymarchTextureJob(GridSize, createWorldDataJob.WorldData);
-        createRaymarchTextureJob.Schedule(gridSizeCubed, 64, worldDataJobHandle).Complete();
-        ComputeBuffer accelerationData = new ComputeBuffer(gridSizeCubed, sizeof(float), ComputeBufferType.Structured);
+        JobHandle handle = createRaymarchTextureJob.Schedule(gridSizeCubed, 64, createWorldDataJob.Schedule(gridSizeCubed, 64));
+
+        handle.Complete();
+
+        ComputeBuffer accelerationData = new ComputeBuffer(GridSize * GridSize * GridSize, sizeof(float), ComputeBufferType.Structured);
         accelerationData.SetData(createRaymarchTextureJob.OutputDistances);
 
-        RaymarcherMaterial.SetInt(_WorldEdgeLengthKernel, GridSize);
-        RaymarcherMaterial.SetBuffer(_AccelerationDataBufferKernel, accelerationData);
+        RaymarchMaterial.SetInt(_WorldEdgeLengthKernel, GridSize);
+        RaymarchMaterial.SetBuffer(_AccelerationDataBufferKernel, accelerationData);
 
         createRaymarchTextureJob.OutputDistances.Dispose();
         createRaymarchTextureJob.Blocks.Dispose();

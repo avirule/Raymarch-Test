@@ -29,7 +29,7 @@ public struct CreateWorldDataJob : IJobParallelFor
         _SeedA = _Seed ^ 2;
         _SeedB = _Seed ^ 3;
 
-        WorldData = new NativeArray<short>(_GridSize * _GridSize * _GridSize, Allocator.TempJob);
+        WorldData = new NativeArray<short>(_GridSize * _GridSize * _GridSize, Allocator.Persistent);
     }
 
     public void Execute(int index)
