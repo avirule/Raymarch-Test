@@ -48,5 +48,5 @@ MonoBehaviour:
   DepthTexture: {fileID: 0}
   RandomSamplerTexture: {fileID: 0}
   CubeMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-  GridSize: 64
+  GridSize: 40
   Regenerate: 1

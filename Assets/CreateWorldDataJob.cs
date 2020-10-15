@@ -29,7 +29,7 @@ public struct CreateWorldDataJob : IJobParallelFor
         _SeedA = _Seed ^ 2;
         _SeedB = _Seed ^ 3;
 
-        WorldData = new NativeArray<short>(_GridSize * _GridSize * _GridSize, Allocator.Persistent);
+        WorldData = new NativeArray<short>(_GridSize * _GridSize * _GridSize, Allocator.TempJob);
     }
 
     public void Execute(int index)
@@ -65,7 +65,7 @@ public struct CreateWorldDataJob : IJobParallelFor
         float noise = OpenSimplexSlim.GetSimplex(_Seed, _Frequency, globalPosition);
         float noiseAsWorldHeight = math.unlerp(-1f, 1f, noise) * _GridSize;
         float noisePersistedWorldHeight =
-            noiseAsWorldHeight + (((_GridSize / 2f) - (noiseAsWorldHeight * 1.25f)) * _Persistence);
+            noiseAsWorldHeight + (((_GridSize * 0.5f) - (noiseAsWorldHeight * 1.25f)) * _Persistence);
 
         return (int)math.floor(noisePersistedWorldHeight);
     }

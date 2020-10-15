@@ -1,3 +1,8 @@
+int3 rayToPoint(float3 rayPosition, int edgeLength)
+{
+    return clamp(rayPosition, 0.0, 1.0 - (1.0 / edgeLength)) * edgeLength;
+}
+
 int project1D(int3 coords, int edgeLength)
 {
     return coords.x + (edgeLength * (coords.y + (edgeLength * coords.z)));
@@ -25,7 +30,6 @@ bool cubeRayIntersection(float3 rayOrigin, float3 rayDirection, float3 cubeMinim
 float raymarch(StructuredBuffer<float> accelerationData, int edgeLength, float epsilon, float3 rayOrigin, float3 rayDirection, out float depth)
 {
     float nearIntersectionDistance, farIntersectionDistance;
-
     if (!cubeRayIntersection(rayOrigin, rayDirection, -0.5, 0.5, nearIntersectionDistance, farIntersectionDistance))
     {
         return 0.0;
@@ -37,12 +41,15 @@ float raymarch(StructuredBuffer<float> accelerationData, int edgeLength, float e
     float accumulatedDistance = nearIntersectionDistance;
     float maximumAccumulatedDistance = farIntersectionDistance;
 
+    // depth = 0.0;
+    // float3 accumulatedRay = rayOrigin + (rayDirection * accumulatedDistance) + 0.5;
+    // return accelerationData[project1D(rayToPoint(accumulatedRay, edgeLength), edgeLength)];
+
     [loop]
     while (accumulatedDistance < maximumAccumulatedDistance)
     {
         float3 accumulatedRay = rayOrigin + (rayDirection * accumulatedDistance) + 0.5;
-        int3 hitPosition = clamp(accumulatedRay * edgeLength, 0.0, edgeLength - 1);
-        float jump = accelerationData[project1D(hitPosition, edgeLength)];
+        float jump = accelerationData[project1D(rayToPoint(accumulatedRay, edgeLength), edgeLength)];
 
         if (jump >= 1.0)
         {

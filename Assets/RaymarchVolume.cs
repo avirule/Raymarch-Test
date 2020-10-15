@@ -3,6 +3,7 @@
 using System.Collections;
 using System.Diagnostics;
 using Unity.Jobs;
+using Unity.Mathematics;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -22,7 +23,6 @@ public class RaymarchVolume : MonoBehaviour
 
     private Stopwatch _Stopwatch;
     private int _Seed;
-    private (bool Observe, JobHandle Handle) Observant;
 
     private readonly Color[] _ColorPalette =
     {
@@ -117,9 +117,7 @@ public class RaymarchVolume : MonoBehaviour
 
         CreateWorldDataJob createWorldDataJob = new CreateWorldDataJob(GridSize, _Seed, _FREQUENCY, _PERSISTENCE);
         CreateRaymarchTextureJob createRaymarchTextureJob = new CreateRaymarchTextureJob(GridSize, createWorldDataJob.WorldData);
-        JobHandle handle = createRaymarchTextureJob.Schedule(gridSizeCubed, 64, createWorldDataJob.Schedule(gridSizeCubed, 64));
-
-        handle.Complete();
+        createRaymarchTextureJob.Schedule(gridSizeCubed, 64, createWorldDataJob.Schedule(gridSizeCubed, 64)).Complete();
 
         ComputeBuffer accelerationData = new ComputeBuffer(GridSize * GridSize * GridSize, sizeof(float), ComputeBufferType.Structured);
         accelerationData.SetData(createRaymarchTextureJob.OutputDistances);

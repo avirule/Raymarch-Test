@@ -4,14 +4,14 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEngine;
-using Random = Unity.Mathematics.Random;
 
 #endregion
 
 [BurstCompile]
 public struct CreateRaymarchTextureJob : IJobParallelFor
 {
+    private const float _SOLID_BASE_VALUE = 1f;
+
     private readonly int _GridSize;
 
     private Random _Random;
@@ -28,7 +28,7 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
         _Random = new Random((uint)new int3(0).GetHashCode());
 
         Blocks = blocks;
-        OutputDistances = new NativeArray<float>(blocks.Length, Allocator.Persistent);
+        OutputDistances = new NativeArray<float>(blocks.Length, Allocator.TempJob);
     }
 
     public void Execute(int index)
@@ -38,17 +38,19 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
 
         if (Blocks[index] > -1)
         {
+            int paletteIndex = 0;
+
             if (coords.y == Blocks[index])
             {
-                OutputDistances[index] = 1f + colorNoise + 1;
+                OutputDistances[index] = _SOLID_BASE_VALUE + colorNoise + (paletteIndex = 1);
             }
             else if ((coords.y < Blocks[index]) && (coords.y > (Blocks[index] - 4)))
             {
-                OutputDistances[index] = 1f + colorNoise + 2;
+                OutputDistances[index] = _SOLID_BASE_VALUE + colorNoise + (paletteIndex = 2);
             }
             else
             {
-                OutputDistances[index] = 1f + colorNoise + 3;
+                OutputDistances[index] = _SOLID_BASE_VALUE + colorNoise + (paletteIndex = 3);
             }
         }
         else
@@ -76,11 +78,11 @@ public struct CreateRaymarchTextureJob : IJobParallelFor
 
     private bool IsBoundingBoxEmpty(int3 start, int3 end)
     {
-        int index = StaticMath.Project1D_XYZ(start, _GridSize);
-        for (int x = start.x; x <= end.x; x++)
+        for (int z = start.z; z <= end.z; z++)
         for (int y = start.y; y <= end.y; y++)
-        for (int z = start.z; z <= end.z; z++, index++)
+        for (int x = start.x; x <= end.x; x++)
         {
+            StaticMath.Project1D_XYZ(x, y, z, _GridSize, out int index);
             if (IsBlockSolid(index))
             {
                 return false;
